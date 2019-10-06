@@ -78,6 +78,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 APP_FLOW_DATA app_flowData;
 uint32_t flow_rate_tmr;
+flow_rate_tmr_timeout = 200;
 // *****************************************************************************
 // *****************************************************************************
 // Section: Application Callback Functions
@@ -158,13 +159,25 @@ void APP_FLOW_Tasks ( void )
         {
             if (flow_rate_timer_flag == 1) {
                 flow_rate_timer_flag = 0;
+                
+                /* Change 1 */
+                // wrap around the timer and clear the flow_rate_freq value 
+                // when the flow is likely 0
+                if (flow_rate_tmr > flow_rate_tmr_timeout) {
+                    flow_rate_tmr = 0;
+                    flow_rate_freq = 0;
+                } else {
+                    flow_rate_tmr++;
+                }
+                
+                /* original code */
                 flow_rate_tmr++;
-            }
+                
+            }        
             
             if (flow_rate_trigger_flag == 1) {
                 flow_rate_trigger_flag = 0;
                 flow_rate_freq = 1/(flow_rate_tmr * 0.00064);
-//                flow_rate_freq = flow_rate_tmr;
                 flow_rate_tmr = 0;
                 
             }

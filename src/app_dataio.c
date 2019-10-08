@@ -1,5 +1,8 @@
+/*
+This module is for external ADC and I/O Expander Data communication.
+Not tested yet
+*/
 #include "app_dataio.h"
-
 
 APP_DATAIO_DATA app_dataioData;
 // NCD9830CH: ADC
@@ -101,12 +104,9 @@ void APP_DATAIO_Tasks ( void )
             if (MCP23016GPB_READ_FLAG[0]) {
                 h2 = DRV_I2C0_TransmitThenReceive(0x40,MCP23016GPB_WRITE,1,MCP23016GPB_READ,2,NULL); 
                 MCP23016GPB_READ_FLAG[0] = 0;
-            };
-
-            
+            }; 
             break;
         }
-        
         
         default:
         {

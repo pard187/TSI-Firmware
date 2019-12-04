@@ -515,7 +515,7 @@ void DRV_TMR2_Initialize(void)
     /* Select clock source */
     PLIB_TMR_ClockSourceSelect ( TMR_ID_4, TMR_CLOCK_SOURCE_PERIPHERAL_CLOCK );
     /* Select prescalar value */
-    PLIB_TMR_PrescaleSelect(TMR_ID_4, TMR_PRESCALE_VALUE_256);
+    PLIB_TMR_PrescaleSelect(TMR_ID_4, TMR_PRESCALE_VALUE_64);
     /* Enable 16 bit mode */
     PLIB_TMR_Mode16BitEnable(TMR_ID_4);
     /* Clear counter */ 

@@ -238,6 +238,9 @@ void SYS_Initialize ( void* data )
     TRISBbits.TRISB15 = 0; // Testing RB15 pin 30
     ANSELBbits.ANSB15 = 0;
     
+    TRISBbits.TRISB5 = 1;
+    TRISBbits.TRISB6 = 1;
+    TRISBbits.TRISB7 = 1;
     
     TRISGbits.TRISG6 = 1; // Safety loop input
     ANSELGbits.ANSG6 = 0;

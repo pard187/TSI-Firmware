@@ -154,18 +154,21 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
     }
     
     // LED lights up according to state_led bits
-//    PORTBbits.RB2 = ((0b00000100 & state_led) == 0b00000100);
-//    PORTBbits.RB3 = ((0b00000010 & state_led) == 0b00000010);
-//    PORTBbits.RB4 = ((0b00000001 & state_led) == 0b00000001);
+    // state LED
+    PORTBbits.RB2 = ((0b00000100 & state_led) == 0b00000100);
+    PORTBbits.RB3 = ((0b00000010 & state_led) == 0b00000010);
+    PORTBbits.RB4 = ((0b00000001 & state_led) == 0b00000001);
 //      PORTBbits.RB2 = 1;
 //      PORTBbits.RB3 = 1;
-//      PORTBbits.RB4 = 1;
+    
+//      PORTBbits.RB4 = throttleImplausibility;
     
 //    PORTBbits.RB2 = saftyloop;
-    
-      PORTBbits.RB2 = drive_btn_pushing;
-      PORTBbits.RB3 = throttlepressed;
-      PORTBbits.RB4 = (throttle < 0xF00);
+//    
+//      PORTBbits.RB2 = drive_btn_pushing;
+//      PORTBbits.RB3 = throttle;
+//      PORTBbits.RB4 = brakePressed;
+//      PORTBbits.RB4 = (throttle < 0xF00);
     
     
     /* Check the application's current state. */
@@ -201,6 +204,10 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             Throttle_SEL=1;
             Cooling_Relay_CTRL=0;
             Spare_LED_CTRL = 0;
+            
+            // reset buzzer
+            buzz_timer = 0;
+            buzz_sound_count = 0;
             
             state_led = 0b001;
             
@@ -253,36 +260,42 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             state_led = 0b011;
             
             // D_LED blink differently for different return conditions
-            if (rc == throttle_Implausible) {
-                if (flash_cntr < 400000000) {
-                    flash_cntr++;
-                } else {
-                    flash_cntr = 0;
+                if (rc == throttle_Implausible) {
+                    if (flash_cntr < 160000) {
+                        flash_cntr++;
+                    } else {
+                        flash_cntr = 0;
+                    }
+                    D_LED_CTRL = (flash_cntr < 80000);
+                } else if (rc == throttle_brake) {
+                    if (flash_cntr < 600000000) {
+                        flash_cntr++;
+                    } else {
+                        flash_cntr = 0;
+                    }
+                    D_LED_CTRL = (flash_cntr < 100000000 | 
+                    (flash_cntr < 300000000 & flash_cntr > 200000000));
+                } else if (rc == mc_not_active) {
+                    if (flash_cntr < 40000000) {
+                        flash_cntr++;
+                    } else {
+                        flash_cntr = 0;
+                    }
+                    D_LED_CTRL = (flash_cntr < 20000000);
                 }
-                D_LED_CTRL = (flash_cntr < 100000000);
-            } else if (rc == throttle_brake) {
-                if (flash_cntr < 600000000) {
-                    flash_cntr++;
-                } else {
-                    flash_cntr = 0;
-                }
-                D_LED_CTRL = (flash_cntr < 100000000 | 
-                (flash_cntr < 300000000 & flash_cntr > 200000000));
-            } else if (rc == mc_not_active) {
-                if (flash_cntr < 40000000) {
-                    flash_cntr++;
-                } else {
-                    flash_cntr = 0;
-                }
-                D_LED_CTRL = (flash_cntr < 20000000);
-            }else if (rc == drive_ok) {
+
+            if (rc == drive_ok) {
                 D_LED_CTRL = 0;
             }
             
             if(saftyloop == 0){
                 rc = safety_loop;
                 app_driver_state_fsmData.state = IDLE;
-            } else if(drive_btn_pushing & !throttleImplausibility & brakePressed & MC_Activate & !throttlepressed){
+            } else if(drive_btn_pushing && brakePressed 
+                    && MC_Activate 
+                    && !throttleImplausibility
+                    && !throttlepressed
+                    ){
                 app_driver_state_fsmData.state = DRIVE_RTDS;
                 // and throttle not pressed
             }
@@ -350,7 +363,7 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             if(saftyloop == 0){
                 rc = safety_loop;
                 app_driver_state_fsmData.state = IDLE;
-            } else if(throttleImplausibility | (throttlepressed & brakePressed) | !MC_Activate | (drive_btn_pushing & brakePressed)){
+            } else if(throttleImplausibility || (throttlepressed & brakePressed) || !MC_Activate || (drive_btn_pushing & brakePressed)){
                 // different blinking for different return condition
                 if (throttleImplausibility) {
                     rc = throttle_Implausible;
@@ -465,7 +478,9 @@ void update_value() {
     
 //    throttleImplausibility = !((MCP23016B_reading & 0x3F) == 0x3F);
     // GPB6
-    throttleImplausibility = ((MCP23016B_reading & 0b01000000) == 0b01000000);
+    
+    throttleImplausibility = PORTEbits.RE6;
+//    throttleImplausibility = 1;throttleImplausibility
     
     // updated from CANBus
     overCurr = over_current();
@@ -479,8 +494,8 @@ void update_value() {
     // pin64
     brakePressed = !PORTEbits.RE4;
     // when MC+ > TSV - 10
-    MC_Activate = mc_active();
-//    MC_Activate = 1;
+//    MC_Activate = mc_active();
+    MC_Activate = 1;
     
     // read values from an ADC on board
     // see isolators page in schematic
@@ -493,13 +508,14 @@ void update_value() {
 
     PORTDbits.RD11 = Spare_LED_CTRL;
     
-    throttle = get_ADCCh(0);
+    //throttle = get_ADCCh(0) >> 4;
+    throttle = PORTBbits.RB5;
 
     //FlowRate = flow_rate_freq;
 //    throttle = get_ADCCh(14)/0x10;
     
-    throttlegreaterthan = throttle > 0x26; // 0.8v
-    throttlepressed = throttle > 0b010000000000; // 1.2v
+    throttlepressed = throttle;
+    throttlegreaterthan = throttlepressed; // 0.8v
     
     // updates by interrupt at RPD1 (FlowRate input to PIC32)
     // to change the interrupt input port

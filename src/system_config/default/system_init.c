@@ -235,8 +235,13 @@ void SYS_Initialize ( void* data )
     TRISBbits.TRISB4 = 0;
     ANSELBbits.ANSB4 = 0;
     
+    ANSELEbits.ANSE6 = 0;
+    
     TRISBbits.TRISB15 = 0; // Testing RB15 pin 30
     ANSELBbits.ANSB15 = 0;
+    
+    // apps read digital
+    ANSELBbits.ANSB5 = 0;
     
     TRISBbits.TRISB5 = 1;
     TRISBbits.TRISB6 = 1;

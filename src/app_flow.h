@@ -199,7 +199,8 @@ void APP_FLOW_Initialize ( void );
 void APP_FLOW_Tasks( void );
 volatile uint32_t flow_rate_trigger_flag;
 volatile uint32_t flow_rate_timer_flag;
-uint32_t flow_rate_freq;
+uint32_t flow_rate_raw;
+uint32_t flow_rate_tmr;
 
 #endif /* _APP_FLOW_H */
 

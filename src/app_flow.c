@@ -1,119 +1,12 @@
-/*******************************************************************************
-  MPLAB Harmony Application Source File
-  
-  Company:
-    Microchip Technology Inc.
-  
-  File Name:
-    app_flow.c
-
-  Summary:
-    This file contains the source code for the MPLAB Harmony application.
-
-  Description:
-    This file contains the source code for the MPLAB Harmony application.  It 
-    implements the logic of the application's state machine and it may call 
-    API routines of other MPLAB Harmony modules in the system, such as drivers,
-    system services, and middleware.  However, it does not call any of the
-    system interfaces (such as the "Initialize" and "Tasks" functions) of any of
-    the modules in the system or make any assumptions about when those functions
-    are called.  That is the responsibility of the configuration-specific system
-    files.
- *******************************************************************************/
-
-// DOM-IGNORE-BEGIN
-/*******************************************************************************
-Copyright (c) 2013-2014 released Microchip Technology Inc.  All rights reserved.
-
-Microchip licenses to you the right to use, modify, copy and distribute
-Software only when embedded on a Microchip microcontroller or digital signal
-controller that is integrated into your product or third party product
-(pursuant to the sublicense terms in the accompanying license agreement).
-
-You should refer to the license agreement accompanying this Software for
-additional information regarding your rights and obligations.
-
-SOFTWARE AND DOCUMENTATION ARE PROVIDED "AS IS" WITHOUT WARRANTY OF ANY KIND,
-EITHER EXPRESS OR IMPLIED, INCLUDING WITHOUT LIMITATION, ANY WARRANTY OF
-MERCHANTABILITY, TITLE, NON-INFRINGEMENT AND FITNESS FOR A PARTICULAR PURPOSE.
-IN NO EVENT SHALL MICROCHIP OR ITS LICENSORS BE LIABLE OR OBLIGATED UNDER
-CONTRACT, NEGLIGENCE, STRICT LIABILITY, CONTRIBUTION, BREACH OF WARRANTY, OR
-OTHER LEGAL EQUITABLE THEORY ANY DIRECT OR INDIRECT DAMAGES OR EXPENSES
-INCLUDING BUT NOT LIMITED TO ANY INCIDENTAL, SPECIAL, INDIRECT, PUNITIVE OR
-CONSEQUENTIAL DAMAGES, LOST PROFITS OR LOST DATA, COST OF PROCUREMENT OF
-SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
-(INCLUDING BUT NOT LIMITED TO ANY DEFENSE THEREOF), OR OTHER SIMILAR COSTS.
- *******************************************************************************/
-// DOM-IGNORE-END
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Included Files 
-// *****************************************************************************
-// *****************************************************************************
-
 #include "app_flow.h"
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Global Data Definitions
-// *****************************************************************************
-// *****************************************************************************
-
-// *****************************************************************************
-/* Application Data
-
-  Summary:
-    Holds application data
-
-  Description:
-    This structure holds the application's data.
-
-  Remarks:
-    This structure should be initialized by the APP_Initialize function.
-    
-    Application strings and buffers are be defined outside this structure.
-*/
+#define READ_CORE_TIMER()                 _CP0_GET_COUNT()          // Read the MIPS Core Timer
 
 APP_FLOW_DATA app_flowData;
-uint32_t flow_rate_tmr;
-// timeout variable
-uint8_t flow_rate_tmr_timeout = 200;
+//uint8_t flow_rate_tmr;
+uint8_t flow_rate_tmr_timeout = 2000;
+uint8_t flow_avg[mov_avg_size];
 
-// *****************************************************************************
-// *****************************************************************************
-// Section: Application Callback Functions
-// *****************************************************************************
-// *****************************************************************************
-
-/* TODO:  Add any necessary callback functions.
-*/
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Application Local Functions
-// *****************************************************************************
-// *****************************************************************************
-
-
-/* TODO:  Add any necessary local functions.
-*/
-
-
-// *****************************************************************************
-// *****************************************************************************
-// Section: Application Initialization and State Machine Functions
-// *****************************************************************************
-// *****************************************************************************
-
-/*******************************************************************************
-  Function:
-    void APP_FLOW_Initialize ( void )
-
-  Remarks:
-    See prototype in app_flow.h.
- */
 
 void APP_FLOW_Initialize ( void )
 {
@@ -122,20 +15,9 @@ void APP_FLOW_Initialize ( void )
     flow_rate_trigger_flag = 0;
     flow_rate_timer_flag = 0;
     flow_rate_tmr = 0;
-    flow_rate_freq = 0;
-    /* TODO: Initialize your application's state machine and other
-     * parameters.
-     */
+    flow_rate_raw = 0;
+    
 }
-
-
-/******************************************************************************
-  Function:
-    void APP_FLOW_Tasks ( void )
-
-  Remarks:
-    See prototype in app_flow.h.
- */
 
 void APP_FLOW_Tasks ( void )
 {
@@ -161,33 +43,25 @@ void APP_FLOW_Tasks ( void )
         {
             if (flow_rate_timer_flag == 1) {
                 flow_rate_timer_flag = 0;
-				
-				/* Change 1 */
-                // wrap around the timer and clear the flow_rate_freq value 
-                // when the flow is likely 0
                 if (flow_rate_tmr > flow_rate_tmr_timeout) {
                     flow_rate_tmr = 0;
-                    flow_rate_freq = 0;
+                    flow_rate_raw = 0;
                 } else {
                     flow_rate_tmr++;
                 }
-				
-                //flow_rate_tmr++;
             }
             
             if (flow_rate_trigger_flag == 1) {
                 flow_rate_trigger_flag = 0;
-                flow_rate_freq = 1/(flow_rate_tmr * 0.00064);
-//                flow_rate_freq = flow_rate_tmr;
+                flow_rate_raw = flow_rate_tmr;
                 flow_rate_tmr = 0;
             }
+            
+                        
+            
+//            flow_rate_raw = moving_avg(flow_avg, flow_rate_raw);
             break;
         }
-
-        /* TODO: implement your application state machine.*/
-        
-
-        /* The default state should never be executed. */
         default:
         {
             /* TODO: Handle error in application's state machine. */

@@ -68,6 +68,8 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 #include "app_driver_state_fsm.h"
 
+#define READ_CORE_TIMER()                 _CP0_GET_COUNT()          // Read the MIPS Core Timer
+
 APP_DRIVER_STATE_FSM_DATA app_driver_state_fsmData;
 uint32_t reading_mc_11; // MC+
 uint32_t reading_mc_22; // TSV
@@ -122,10 +124,6 @@ void APP_DRIVER_STATE_FSM_Initialize ( void )
     
     mc_voltage_val = 0;
     ts_voltage_val = 0;
-    state_led = 0b000;
-    /* TODO: Initialize your application's state machine and other
-     * parameters.
-     */
 }
 
 
@@ -153,23 +151,28 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
         
     }
     
-    // LED lights up according to state_led bits
-    // state LED
-    PORTBbits.RB2 = ((0b00000100 & state_led) == 0b00000100);
-    PORTBbits.RB3 = ((0b00000010 & state_led) == 0b00000010);
-    PORTBbits.RB4 = ((0b00000001 & state_led) == 0b00000001);
-//      PORTBbits.RB2 = 1;
-//      PORTBbits.RB3 = 1;
-    
-//      PORTBbits.RB4 = throttleImplausibility;
+    /* LED settings */
+//    PORTBbits.RB2 = ((0b00000100 & states) == 0b00000100);
+    PORTBbits.RB3 = ((0b00000010 & states) == 0b00000010);
+    PORTBbits.RB4 = ((0b00000001 & states) == 0b00000001);
+////    
+//      PORTBbits.RB4 = 1;
     
 //    PORTBbits.RB2 = saftyloop;
-//    
-//      PORTBbits.RB2 = drive_btn_pushing;
-//      PORTBbits.RB3 = throttle;
-//      PORTBbits.RB4 = brakePressed;
-//      PORTBbits.RB4 = (throttle < 0xF00);
+//     
+      PORTBbits.RB2 = flow_rate_timer_flag;
+//      PORTBbits.RB3 = CoolTemp_1 > 0b01000000;  
+//      PORTBbits.RB4 = CoolTemp_1 > 0b11100000;
     
+//    PORTBbits.RB4 = PORTGbits.RG7;
+//    PORTBbits.RB3 = throttlegreaterthan;
+//    set_NCD9830_READ_flag(7);
+//    PORTBbits.RB2 = get_NCD9830_reading(6) > 0b10000000;
+//    PORTBbits.RB3 = get_NCD9830_reading(7) > 0b10000000;
+//    int mcResult = mc_active();
+//    PORTBbits.RB4 = mc_active();
+    
+      
     
     /* Check the application's current state. */
     switch ( app_driver_state_fsmData.state )
@@ -198,26 +201,27 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
 
         case IDLE:
         {
+            // new:
+            update_value();
+            
             states = 0x1;
 //            BUZZER_CTRL=0;
             D_LED_CTRL=0;
-            Throttle_SEL=1;
-            Cooling_Relay_CTRL=0;
+            Throttle_SEL = 0;
+            Cooling_Relay_CTRL = 0;
             Spare_LED_CTRL = 0;
             
             // reset buzzer
             buzz_timer = 0;
             buzz_sound_count = 0;
             
-            state_led = 0b001;
-            
             if (rc == safety_loop) {
-                if (flash_cntr < 800000000) {
+                if (flash_cntr < 80000) {
                     flash_cntr++;
                 } else {
                     flash_cntr = 0;
                 }
-                D_LED_CTRL = (flash_cntr < 400000000);
+                D_LED_CTRL = (flash_cntr < 40000);
             }
             
             if(saftyloop){
@@ -228,15 +232,16 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
         
         case PRECHARGE:
         {
+            // new:
+            update_value();
+            
             states = 0x2;
 //            BUZZER_CTRL=0;
             D_LED_CTRL=0;
             rc = drive_ok;
             Throttle_SEL=0;
-            Cooling_Relay_CTRL=0;
+            Cooling_Relay_CTRL = 1;
             Spare_LED_CTRL = 0;
-            
-            state_led = 0b010;
             
             if(saftyloop == 0){
                 rc = safety_loop;
@@ -251,40 +256,43 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
         {
             update_value();
             states = 0x3;
-            Throttle_SEL=0;
-            Cooling_Relay_CTRL=1;
+            // testing
+            Throttle_SEL = 0;
+            Cooling_Relay_CTRL = 1;
 //            D_LED_CTRL = 0;
             Spare_LED_CTRL = 0;
-//            buzz_sound_count = 0; // reset buzzer sound time counter
-            
-            state_led = 0b011;
+            buzz_sound_count = 0; // reset buzzer sound time counter
             
             // D_LED blink differently for different return conditions
-                if (rc == throttle_Implausible) {
-                    if (flash_cntr < 160000) {
-                        flash_cntr++;
-                    } else {
-                        flash_cntr = 0;
-                    }
-                    D_LED_CTRL = (flash_cntr < 80000);
-                } else if (rc == throttle_brake) {
-                    if (flash_cntr < 600000000) {
-                        flash_cntr++;
-                    } else {
-                        flash_cntr = 0;
-                    }
-                    D_LED_CTRL = (flash_cntr < 100000000 | 
-                    (flash_cntr < 300000000 & flash_cntr > 200000000));
-                } else if (rc == mc_not_active) {
-                    if (flash_cntr < 40000000) {
-                        flash_cntr++;
-                    } else {
-                        flash_cntr = 0;
-                    }
-                    D_LED_CTRL = (flash_cntr < 20000000);
+            // throttle implausible: quick flash
+            if (rc == throttle_Implausible) {
+                if (flash_cntr < 80000) {
+                    flash_cntr++;
+                } else {
+                    flash_cntr = 0;
                 }
-
-            if (rc == drive_ok) {
+                D_LED_CTRL = (flash_cntr < 20000);
+            // throttle & brake pressed: long flash + short pulse  
+            } else if (rc == throttle_brake) {
+                if (flash_cntr < 160000) {
+                    flash_cntr++;
+                } else {
+                    flash_cntr = 0;
+                }
+                D_LED_CTRL = (flash_cntr < 40000);
+            // mc not active: slow flash
+            } else if (rc == mc_not_active) {
+                if (flash_cntr < 200000) {
+                    flash_cntr++;
+                } else {
+                    flash_cntr = 0;
+                }
+                D_LED_CTRL = (flash_cntr < 100000);
+            // correct exit: drive btn + brake: off 
+            } else if (rc == drivebtn_brake) {
+                D_LED_CTRL = 0;
+            // default    
+            } else if (rc == drive_ok) {
                 D_LED_CTRL = 0;
             }
             
@@ -311,10 +319,13 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
         // add spare bits in can message
         case DRIVE_RTDS:
         {
+            Throttle_SEL = 0;
             states = 0x4;
             PORTEbits.RE0 = 1;
             // clear return condition
             rc == drive_ok;
+            D_LED_CTRL = 0;
+            Cooling_Relay_CTRL = 1;
             flash_cntr = 0;
             if (buzz_timer_flag) {
                 buzz_timer_flag = 0;
@@ -327,9 +338,7 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
                     }
                     //add another state count to 10
                 }
-            }
-            
-            state_led = 0b100;
+            }     
             
             if(saftyloop == 0){
                 PORTEbits.RE0 = 0;
@@ -338,27 +347,25 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             }
             else if (buzz_sound_count >= 6) {
                 PORTEbits.RE0 = 0;
-                if (!drive_btn_pushing && brakePressed && !throttlepressed) {
+                // go to DRIVE state immediately if throttle is not pressed
+                if (!throttlepressed) {
                     app_driver_state_fsmData.state = DRIVE;
-                    // if throttle pressed and brake can't go
                 }
             }
             break;
         }
         
         case DRIVE:
-        {
+        {       
             //buzz_sound_count = 0;
             // set ctrl to 0
             states = 0x5;
             D_LED_CTRL=1;
             Throttle_SEL=1;
-//            Cooling_Relay_CTRL=1;
+            Cooling_Relay_CTRL = 1;
 //            BUZZER_CTRL=~buzz_flag;
             Spare_LED_CTRL = 1;
             // no need to clear count
-            
-            state_led = 0b101;
             
             if(saftyloop == 0){
                 rc = safety_loop;
@@ -391,17 +398,15 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
 //            BUZZER_CTRL=0;
 //            D_LED_CTRL=1;
             Throttle_SEL=0;
-            Cooling_Relay_CTRL=1;
+            Cooling_Relay_CTRL = 1;
             Spare_LED_CTRL = 0;
             // blink D_LED to indicate state
-            if (flash_cntr < 200000000) {
+            if (flash_cntr < 200000) {
                 flash_cntr++;
             } else {
                 flash_cntr = 0;
             }
-            D_LED_CTRL = (flash_cntr < 100000000);
-            
-            state_led = 0b110;
+            D_LED_CTRL = (flash_cntr < 100000);
             
             if(saftyloop == 0){
                 rc = safety_loop;
@@ -422,11 +427,10 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
         
         case DRIVE_RETURN: 
         {
+            Cooling_Relay_CTRL = 1;
             // turn off drive LED
             // different frequency to blink for different problem
-            states = 0x8;
-            
-            state_led = 0b111;
+            states = 0x7;
             
             // flash to tell the driver to stop pushing drive button
             if (flash_cntr < 1000000000) {
@@ -470,14 +474,8 @@ void update_value() {
     
     
 //    PC_Ready = ((MCP23016B_reading & 0x80) == 0x80); 
-//    PC_Ready = (PORTDbits.RD9 != 0);
-//    PC_Ready = !PORTDbits.RD9;
     // pin48
     PC_Ready = !PORTCbits.RC14;
-//    PC_Ready = 1;
-    
-//    throttleImplausibility = !((MCP23016B_reading & 0x3F) == 0x3F);
-    // GPB6
     
     throttleImplausibility = PORTEbits.RE6;
 //    throttleImplausibility = 1;throttleImplausibility
@@ -488,14 +486,12 @@ void update_value() {
     // name should be safetyloop
     // pin4
     saftyloop = !PORTGbits.RG6;
-//    saftyloop = get_ADCCh(45)/0x10;
     
 //    DriverButton_Pushed = PORTDbits.RD1;
     // pin64
     brakePressed = !PORTEbits.RE4;
     // when MC+ > TSV - 10
-//    MC_Activate = mc_active();
-    MC_Activate = 1;
+    MC_Activate = mc_active();
     
     // read values from an ADC on board
     // see isolators page in schematic
@@ -505,17 +501,14 @@ void update_value() {
     // TODO: input of get_ADCCh should be analog input port# (e.g. AN1)
     PORTDbits.RD0 = D_LED_CTRL;
     PORTBbits.RB8 = Throttle_SEL;
-
+    PORTEbits.RE7 = Cooling_Relay_CTRL;
     PORTDbits.RD11 = Spare_LED_CTRL;
-    
-    //throttle = get_ADCCh(0) >> 4;
-    throttle = PORTBbits.RB5;
 
-    //FlowRate = flow_rate_freq;
-//    throttle = get_ADCCh(14)/0x10;
+    throttle = get_ADCCh(0);
     
-    throttlepressed = throttle;
-    throttlegreaterthan = throttlepressed; // 0.8v
+    // 0xFFF is 3.3v
+    throttlepressed = (throttle > 0b010111010001); // 1.2v 
+    throttlegreaterthan = (throttle > 0b001111100001); // 0.8v
     
     // updates by interrupt at RPD1 (FlowRate input to PIC32)
     // to change the interrupt input port
@@ -523,33 +516,37 @@ void update_value() {
     a1 = get_NCD9830_reading(3);
     a2 = get_NCD9830_reading(4);
     
-    cur_sen_cntr++;
-    cur_sen_val = cur_sen_val + abs(a2-a1);
+//    cur_sen_cntr++;
+//    cur_sen_val = cur_sen_val + abs(a2-a1);
 //    cur_hv_val = 1000 * cur_sen_val/cur_sen_cntr;
 //    cur_hv_val = moving_avg(hv_avg, a1-a2);
     cur_hv_val = abs(a1 - a2);
 
-    cur_nor_val = cur_sen_val/cur_sen_cntr;
+//    cur_nor_val = cur_sen_val/cur_sen_cntr;
     
     // should not work. see throttle
-    CoolTemp_1 = get_ADCCh(1)/16;
-    CoolTemp_2 = get_ADCCh(2)/16;
-//    CoolTemp_1 = get_ADCCh(5);
-//    CoolTemp_2 = get_ADCCh(7);
+//    CoolTemp_1 = get_ADCCh(1)/16;
+//    CoolTemp_2 = get_ADCCh(2)/16;
+    CoolTemp_1 = get_ADCCh(1) >> 4;
+    CoolTemp_2 = get_ADCCh(2) >> 4;
     // for testing
 //    PORTBbits.RB3 = DriverButton_Pushed;
 }
 
 int over_current() {
-    return cur_nor_val >= overCurr_val;
+    return abs(a1 - a2) > 0b10001110; // 300 A
+//    return 0;
 }
 
 int mc_active() {
-    
+//    set_NCD9830_READ_flag(7);
+//    set_NCD9830_READ_flag(6);
     reading_mc_11 = get_NCD9830_reading(7); // MC+
     reading_mc_22 = get_NCD9830_reading(6); // TSV
-	mc_voltage_val = moving_avg(mc_avg, reading_mc_11);
-	ts_voltage_val = moving_avg(ts_avg, reading_mc_22);
+    mc_voltage_val = reading_mc_11;
+    ts_voltage_val = reading_mc_22;
+//	mc_voltage_val = moving_avg(mc_avg, reading_mc_11);
+//	ts_voltage_val = moving_avg(ts_avg, reading_mc_22);
 	
     
 /*     if (mc_voltage_sum + reading_mc_11 > mc_voltage_sum) {
@@ -576,11 +573,9 @@ int mc_active() {
 //    } */
     
     
-//    if (reading_mc_11 > reading_mc_22) return 1;
-//    if (reading_mc_11 > 0) return 1;
-    // mc_22 - 10
-//    else return 0;
-    return 1;
+    if (reading_mc_11 > reading_mc_22 - 0b00001100 && reading_mc_11 > 0b00001000) return 1;
+    else return 0;
+//    return 1;
 }
 
 int get_pad_voltage() {
@@ -596,22 +591,29 @@ void send_conditions() {
     uint8_t conditions = throttlepressed + (throttleImplausibility*2) + (overCurr*4) + (saftyloop*8) + (drive_btn_pushing*16) + 
                          (brakePressed*32) + (MC_Activate*64) + (PC_Ready*128);
     
-    can_send_bytes(0x555,conditions,mc_voltage_val,ts_voltage_val,CoolTemp_1,CoolTemp_2,flow_rate_raw,states,cur_hv_val);
-    can_send_bytes(0x596,0x0A,throttle,0x00,0x00,0x00,0x00,0x00,0x00);
-    // send one more frame to a different address, check space availability
-    cur_sen_cntr = 0;
-    cur_sen_val = 0;
+    // flow rate raw: check app_flow.c
+    // rcAndStates: combine return condition and states together in 1 byte
+    // throttle_new: convert throttle adc reading from 12bits to 8bits
+    uint8_t rcAndStates = (rc << 4) + states;
+    uint8_t throttle_new = throttle >> 4; 
+
+//        flow_rate_raw = 0.0535 + 757.5 * (1 / flow_rate_raw);
     
-    //mc_voltage_val = 0;
-    //ts_voltage_val = 0;
-    
-//    boardtemp = get_ADCCh(9);
-//    can_send_bytes(0x300,get_ADCCh(0)/0x10,get_ADCCh(1)/0x10,get_ADCCh(2)/0x10,get_ADCCh(4)/0x10,3,get_ADCCh(9),PC_Ready,rand() % 0xFF);
-//    can_send_bytes(0x300,a2,a1,abs(a2),abs(a1),3,3,4,4);
-//    can_send_bytes(0x300,states,reading_1,reading_2,reading_mc_11,reading_mc_22,a1,a2,abs(a2-a1));
-//    rand() % 0xFF
-//    can_send_bytes(0x400,a1,a2,reading_mc_22,CoolTemp_1,CoolTemp_2,FlowRate,states,rand() % 0xFF);
+    uint8_t flow_rate_byte = flow_rate_raw & 0b11111111;
+    can_send_bytes(0x183, conditions, mc_voltage_val, ts_voltage_val, CoolTemp_1, throttle_new, flow_rate_byte, rcAndStates, cur_hv_val);
+//    cur_sen_cntr = 0;
+//    cur_sen_val = 0;
 }
+
+void delay_ms(uint16_t microseconds)
+{
+    uint32_t time;
+    
+    time = READ_CORE_TIMER(); // Read Core Timer    
+    time += (SYS_CLK_FREQ / 2 / 1000000) * microseconds; // calc the Stop Time    
+    while ((int32_t)(time - READ_CORE_TIMER()) > 0){};    
+}
+
 
 /*******************************************************************************
  End of File

@@ -61,14 +61,13 @@ typedef struct
 
 typedef enum {
     // different cases that car exits drive state
-    drive_ok = 0,
-    safety_loop,
-    over_current_cond,
-    drivebtn_brake,
-    throttle_Implausible,
-    throttle_brake,
-    mc_not_active
-            
+    drive_ok = 0x0,
+    safety_loop = 0x1,
+    over_current_cond = 0x2,
+    drivebtn_brake = 0x3,
+    throttle_Implausible = 0x4,
+    throttle_brake = 0x5,
+    mc_not_active = 0x6 
 } return_condition;
 
 void APP_DRIVER_STATE_FSM_Initialize ( void );

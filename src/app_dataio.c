@@ -24,7 +24,7 @@
 
 
 APP_DATAIO_DATA app_dataioData;
-
+// buffers
 uint8_t NCD9830CH_READ_FLAG[8];
 uint8_t NCD9830CH_WRITE[8];
 uint8_t NCD9830CH_READ[8];
@@ -66,6 +66,8 @@ void APP_DATAIO_Initialize ( void )
 {
 
     app_dataioData.state = APP_DATAIO_STATE_INIT;
+    // port reading settings
+    // read data sheet
     NCD9830CH_WRITE[0] = 0b10000100;
     NCD9830CH_WRITE[1] = 0b11000100;
     NCD9830CH_WRITE[2] = 0b10010100;
@@ -132,6 +134,8 @@ void APP_DATAIO_Tasks ( void )
 
             
             int i;
+            // in rev. 4 for some reason it does not iterate to port 8
+            // in this case try increase start point
             for (i = 0; i < 8; i++) {
                 if (NCD9830CH_READ_FLAG[i]) {
 //                if(1){
@@ -147,7 +151,8 @@ void APP_DATAIO_Tasks ( void )
 //                    
 //                    PORTBbits.RB2 = !PORTBbits.RB2;
 //                    h2 = DRV_I2C0_TransmitThenReceive(0b10010100,NCD9830CH_WRITE+i,1,NCD9830CH_READ+i,1,NULL); 
-                    
+                    // send pin info first, then read from ADC
+                    // read the data sheet
                     h2 = DRV_I2C0_TransmitThenReceive(0x94,NCD9830CH_WRITE+i,1,NCD9830CH_READ+i,1,NULL); 
                     NCD9830CH_READ_FLAG[i] = 0;
                 }

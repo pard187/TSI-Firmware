@@ -139,40 +139,13 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             send_cond_timer = 0;
 //            PORTBbits.RB2 = ~PORTBbits.RB2;
         }
-//        if (buzz_timer > 10) {
-////            uint8_t a = PORTBbits.RB15;
-////            PORTBbits.RB15 = ~PORTBbits.RB15;
-//            buzz_timer = 0;
-//            if (app_driver_state_fsmData.state == DRIVE_RTDS && buzz_sound_count < 6) {
-//                buzz_sound_count++;
-//                PORTBbits.RB15 = ~PORTBbits.RB15;
-//            }
-//        }
-        
     }
     
     /* LED settings */
-//    PORTBbits.RB2 = ((0b00000100 & states) == 0b00000100);
+    // display current drive state
+    PORTBbits.RB2 = ((0b00000100 & states) == 0b00000100);
     PORTBbits.RB3 = ((0b00000010 & states) == 0b00000010);
-    PORTBbits.RB4 = ((0b00000001 & states) == 0b00000001);
-////    
-//      PORTBbits.RB4 = 1;
-    
-//    PORTBbits.RB2 = saftyloop;
-//     
-      PORTBbits.RB2 = flow_rate_timer_flag;
-//      PORTBbits.RB3 = CoolTemp_1 > 0b01000000;  
-//      PORTBbits.RB4 = CoolTemp_1 > 0b11100000;
-    
-//    PORTBbits.RB4 = PORTGbits.RG7;
-//    PORTBbits.RB3 = throttlegreaterthan;
-//    set_NCD9830_READ_flag(7);
-//    PORTBbits.RB2 = get_NCD9830_reading(6) > 0b10000000;
-//    PORTBbits.RB3 = get_NCD9830_reading(7) > 0b10000000;
-//    int mcResult = mc_active();
-//    PORTBbits.RB4 = mc_active();
-    
-      
+    PORTBbits.RB4 = ((0b00000001 & states) == 0b00000001);    
     
     /* Check the application's current state. */
     switch ( app_driver_state_fsmData.state )
@@ -215,6 +188,8 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             buzz_timer = 0;
             buzz_sound_count = 0;
             
+	    // rc: return condition
+	    // flash drive LED if the safety loop is broken and it returns to IDLE
             if (rc == safety_loop) {
                 if (flash_cntr < 80000) {
                     flash_cntr++;
@@ -223,7 +198,8 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
                 }
                 D_LED_CTRL = (flash_cntr < 40000);
             }
-            
+            // why missing an 'e'? ask class of 2019
+	    // transition to the next state
             if(saftyloop){
                 app_driver_state_fsmData.state = PRECHARGE;
             }
@@ -311,12 +287,6 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             break;
         }
         
-        
-        // use the opamp to do calculation
-        // add throttle voltage to be sent
-        // send two packet 
-        // mc voltage
-        // add spare bits in can message
         case DRIVE_RTDS:
         {
             Throttle_SEL = 0;
@@ -452,11 +422,6 @@ void APP_DRIVER_STATE_FSM_Tasks ( void )
             
             break;
         }
-        
-        
-        /* TODO: implement your application state machine.*/
-        
-
         /* The default state should never be executed. */
         default:
         {
@@ -478,7 +443,6 @@ void update_value() {
     PC_Ready = !PORTCbits.RC14;
     
     throttleImplausibility = PORTEbits.RE6;
-//    throttleImplausibility = 1;throttleImplausibility
     
     // updated from CANBus
     overCurr = over_current();
@@ -490,7 +454,6 @@ void update_value() {
 //    DriverButton_Pushed = PORTDbits.RD1;
     // pin64
     brakePressed = !PORTEbits.RE4;
-    // when MC+ > TSV - 10
     MC_Activate = mc_active();
     
     // read values from an ADC on board
@@ -523,10 +486,8 @@ void update_value() {
     cur_hv_val = abs(a1 - a2);
 
 //    cur_nor_val = cur_sen_val/cur_sen_cntr;
-    
-    // should not work. see throttle
-//    CoolTemp_1 = get_ADCCh(1)/16;
-//    CoolTemp_2 = get_ADCCh(2)/16;
+	
+    // converts from 12 bits to 8 bits
     CoolTemp_1 = get_ADCCh(1) >> 4;
     CoolTemp_2 = get_ADCCh(2) >> 4;
     // for testing

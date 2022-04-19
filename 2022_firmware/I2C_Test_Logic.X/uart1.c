@@ -12,8 +12,12 @@
         U1BRG = (FCLK / (baudrate * 16)) - 1;
         U1STAbits.UTXEN = 1;
         U1STAbits.URXEN = 1;
-        RPF5R = 0x1;  // connect U1TX to RPF5 (pin 42 "PIC_RXD" on PIC32 --> pin 1 "CAN_H" on J6)
-        U1RXR = 0x2;  // connect U1RX to RPF4 (pin 41 "PIC_TXD" on PIC32 --> pin 2 "CAN_L" on J6)
+        // Pins for PIC32 BOB //
+//        RPF5R = 0x1;  // connect U1TX to RPF5 (pin 42 "PIC_RXD" on PIC32 --> pin 1 "CAN_H" on J6)
+//        U1RXR = 0x2;  // connect U1RX to RPF4 (pin 41 "PIC_TXD" on PIC32 --> pin 2 "CAN_L" on J6)
+        // Pins for PIC32 on the NEW TSI //
+        RPD11R = 0x1;  // connect U1TX to RPD11
+        U1RXR = 0x3;  // connect U1RX to RPD10
         U1MODEbits.ON = 1; // turn your radio on!
     }
    

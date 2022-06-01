@@ -1,9 +1,9 @@
 /*******************************************************************************
   MPLAB Harmony Application Source File
-  
+
   Company:
     Microchip Technology Inc.
-  
+
   File Name:
     app_can.c
 
@@ -11,8 +11,8 @@
     This file contains the source code for the MPLAB Harmony application.
 
   Description:
-    This file contains the source code for the MPLAB Harmony application.  It 
-    implements the logic of the application's state machine and it may call 
+    This file contains the source code for the MPLAB Harmony application.  It
+    implements the logic of the application's state machine and it may call
     API routines of other MPLAB Harmony modules in the system, such as drivers,
     system services, and middleware.  However, it does not call any of the
     system interfaces (such as the "Initialize" and "Tasks" functions) of any of
@@ -49,7 +49,7 @@ SUBSTITUTE GOODS, TECHNOLOGY, SERVICES, OR ANY CLAIMS BY THIRD PARTIES
 
 // *****************************************************************************
 // *****************************************************************************
-// Section: Included Files 
+// Section: Included Files
 // *****************************************************************************
 // *****************************************************************************
 
@@ -91,7 +91,7 @@ void APP_CAN_Tasks ( void )
             bool appInitialized = true;
             array_count = 0;
             current_ptr = 0;
-        
+
             if (appInitialized)
             {
                 app_canData.state = APP_CAN_STATE_WAIT;
@@ -104,20 +104,20 @@ void APP_CAN_Tasks ( void )
             if (current_ptr != array_count) { // messages are added to send array
                 app_canData.state = APP_CAN_STATE_SEND;
             }
-            else { 
+            else {
                 // all messages are sent in send array, clear the pointer
                 current_ptr = 0;
                 array_count = 0;
             }
             break;
         }
-        case APP_CAN_STATE_SEND: 
+        case APP_CAN_STATE_SEND:
         {
             if (!CAN_SEND_TASK()) app_canData.state = APP_CAN_STATE_WAIT; //keep sending message until all messages in send array are sent;
             break;
         }
         /* TODO: implement your application state machine.*/
-        
+
 
         /* The default state should never be executed. */
         default:
@@ -128,13 +128,14 @@ void APP_CAN_Tasks ( void )
     }
 }
 
+
 int CAN_SEND_TASK() {
     if (current_ptr == array_count) {
         return 0; // All message are sent, APP_CAN_STATE change to WAIT state
     }
     else {
         if(DRV_CAN0_ChannelMessageTransmit(CAN_CHANNEL0, addr_array[current_ptr], CAN_MESSAGE_SEND_BYTES,
-                message_array[current_ptr]) == false); // blocking can transmite function 
+                message_array[current_ptr]) == false); // blocking can transmite function
 //        DRV_CAN0_ChannelMessageTransmit(CAN_CHANNEL0, addr_array[current_ptr], CAN_MESSAGE_SEND_BYTES,
 //                message_array[current_ptr]);
         current_ptr++;
@@ -149,13 +150,13 @@ int CAN_SEND_TASK() {
  *  1 will be returned if can message is added successfully into send array;
  *  0 will be returned if can message is not added.
  */
-int can_send_bytes(uint16_t send_addr, uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4, 
+int can_send_bytes(uint16_t send_addr, uint8_t b0, uint8_t b1, uint8_t b2, uint8_t b3, uint8_t b4,
                     uint8_t b5, uint8_t b6, uint8_t b7) {
-    
+
     if (array_count < CAN_MESSAGE_SEND_ARRAY_LENGTH) { // available place in can send array
-        
+
         addr_array[array_count] = send_addr; // store array value
-        
+
         int i;
         for (i = 0; i < CAN_MESSAGE_SEND_BYTES; i++) { // put message in queue
             switch(i) {

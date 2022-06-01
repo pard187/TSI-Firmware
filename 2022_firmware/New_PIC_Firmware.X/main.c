@@ -78,7 +78,7 @@ uint32_t Safety_Loop; // RC13 --> 47 (PIC) / 74 (BOB) - DIP3
 uint32_t Drive_BTN_LOGIC; // RC14 --> 48 (PIC) / 75 (BOB) - DIP4
 uint32_t PC_Ready; // RC15 --> 32 (PIC) / 41 (BOB) - DIP5
 uint32_t Throttle_PL_LOGIC; // RE6 --> 2 (PIC) / 2 (BOB) - DIP6
-  
+
 
 // OUTPUT VARIABLES //
 uint32_t Cooling_CTRL; // RD0 --> 46 (PIC) / 73 (BOB) - BLUE
@@ -94,8 +94,8 @@ uint16_t rst_rtds, rst_dbtn_unpress, rst_dbtn_press, rst_cooldn; // reset variab
 uint32_t cnt_rtds = 20, cnt_dbtn_unpress = 10, cnt_dbtn_press = 3, cnt_cooldn = 30; // count duration for other timers (counts of ~100 ms)
 uint32_t done_rtds, done_dbtn_unpress, done_dbtn_press, done_cooldn; // treated as booleans to store the state of each timer
 char value; // stores the analog value of flowrate coming straight from the ADC
-uint32_t Flowrate_LOGIC, Flowrate_LOGIC_old, Flowrate_CALC = 1; // more variables for processing and calculating flowrate 
-uint32_t flowrate_low_thresh = 0, flowrate_upp_thresh = 0; // lower and upper threshold for transitions based on flowrate - currently both at zero, can change later 
+uint32_t Flowrate_LOGIC, Flowrate_LOGIC_old, Flowrate_CALC = 1; // more variables for processing and calculating flowrate
+uint32_t flowrate_low_thresh = 0, flowrate_upp_thresh = 0; // lower and upper threshold for transitions based on flowrate - currently both at zero, can change later
 uint16_t ta1 = 0, tb1 = 0, rst_timeout, tb_timeout, cnt_cur1, cnt_timeout = 600; // timer variables specific to the flowrate timeout - timeout at 1 min
 uint16_t first_read; // treated as boolean to implement the flowrate logic
 uint32_t Drive_BTN_LOGIC_old; // stores the old DRIVE_BTN_LOGIC value for debouncing
@@ -104,8 +104,8 @@ char buf[100]; // string buffer for UART printing
 
 
 // HELPER FUNCTIONS //
-// flashes the drive button LED at a pattern specified by cnt_on and cnt_off which are counts of ~100ms 
-void flash_LED(uint16_t rst_flash, uint16_t cnt_on, uint16_t cnt_off){ 
+// flashes the drive button LED at a pattern specified by cnt_on and cnt_off which are counts of ~100ms
+void flash_LED(uint16_t rst_flash, uint16_t cnt_on, uint16_t cnt_off){
     if(D_LED_CTRL == 1 && timer1_cnt_auto(rst_flash, &ta, &tb, &cnt_cur, cnt_on)){
         D_LED_CTRL = 0;
         return;
@@ -161,20 +161,20 @@ void GPIO_setup(){
     TRISCbits.TRISC15 = 1;
     ANSELEbits.ANSE6 = 0;
     TRISEbits.TRISE6 = 1;
-    
+
     // Outputs
     TRISDbits.TRISD0 = 0;
-    TRISDbits.TRISD1 = 0;   
+    TRISDbits.TRISD1 = 0;
     TRISDbits.TRISD3 = 0;
     TRISEbits.TRISE0 =  0;
-} // GPIO_setup
+} // GPIO_setup()
 
 
 // Updates all input and output values
 void val_update(){
     // Inputs
     //    Flowrate_LOGIC = PORTBbits.RB7; // OLD WAY: read as digital - inaccurate
-    NCD9830_read(U43_NCD9830_ADDRESS, CH7, &value); // NEW WAY: read as analog (via I2C) then convert to digital - works 
+    NCD9830_read(U43_NCD9830_ADDRESS, CH7, &value); // NEW WAY: read as analog (via I2C) then convert to digital - works
     Flowrate_ANALOG = (float) (value/255.0) * 5.0;
     Flowrate_LOGIC_old = Flowrate_LOGIC;
     if(Flowrate_ANALOG <= 0.7) Flowrate_LOGIC = 0;
@@ -186,7 +186,7 @@ void val_update(){
     Drive_BTN_LOGIC = !PORTCbits.RC14;
     PC_Ready = PORTCbits.RC15;
     Throttle_PL_LOGIC = !PORTEbits.RE6;
-    
+
     // Outputs
     LATDbits.LATD0 = Cooling_CTRL;
     LATDbits.LATD1 = D_LED_CTRL;
@@ -303,7 +303,7 @@ void DRIVE_STATE_FSM(){
             rst_cooldn = 1;
             break;
     }
-    
+
     // Drive States Transitions
     switch(DRIVE_STATE){
         case IDLE:
@@ -346,19 +346,19 @@ void DRIVE_STATE_FSM(){
 
 
 // MAIN //
-void main(){    
+void main(){
     uart1_init(9600); // initialize UART1 at baud rate = 9600 bit/sec
     uart1_txwrite_str("\nTEST Main\n");
-    
+
     timer1_init(); // initialize timer1 - same timer is used to time different tasks
     Setup_I2C(); // initialize I2C for 100 kHz communication by default
     GPIO_setup(); // set up all input and output pins
     ta = timer1_read(); // initialize the first timer reading (before loop)
-    
+
     while(1){
         val_update(); // update all input and output values
         DRIVE_STATE_FSM(); // write outputs and transition through the FSM
-        
+
         ////  uncomment to print values via UART  ////
         //    sprintf(buf, "Flowrate_LOGIC_old: %d\t", Flowrate_LOGIC_old);
         //    uart1_txwrite_str(buf);

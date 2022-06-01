@@ -10,12 +10,9 @@ uint16_t timer1_read(){
     return TMR1;
 }
 
-char buf[100];
-
 uint16_t inline ticks_to_ms(uint16_t dt){
         return ((uint16_t)dt * PRESCALE) / (CLOCK_FREQ/1000);
 }
-
 
 uint16_t timer1_elapsed_ms(uint16_t t1, uint16_t t2){
     if(t2 >= t1) return ticks_to_ms(t2-t1);
@@ -37,7 +34,7 @@ uint16_t timer1_cnt_auto(uint16_t rst, uint16_t *ta, uint16_t *tb, uint16_t *cnt
         *cnt_cur = 0;
     }
     *tb = timer1_read();
-    if(timer1_elapsed_ms(*ta, *tb) >= 100){
+    if(timer1_elapsed_ms(*ta, *tb) >= 30){
         *ta = *tb;
         *cnt_cur+=1;
     }

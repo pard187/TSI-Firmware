@@ -1,6 +1,6 @@
 # TSI-Firmware
 
-This branch has been refactored to keep track of all firmware versions and to make deployment to additional computers easier. It is the location for the most recent firmware code written by the 2022 team while also keeping the 2020-2021 teams work for reference. Note that some of the older code versions used the Harmony Configurator which requires a different setup process. It is not used by the 2022 firmware and is not recommended for this project anyway. 
+This branch has been refactored to keep track of the TSI firmware versions and to make deployment to additional computers easier. It is the location for the most recent firmware code written by the 2022 team while also keeping the 2020-2021 teams work for reference. Note that some of the older code versions used the Harmony Configurator which requires a different setup process. It is not used by the 2022 firmware and is not recommended for this project anyway. 
 
 # Installation and Running
 

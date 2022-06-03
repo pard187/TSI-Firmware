@@ -1,4 +1,3 @@
-
 /*** DEVCFG0 ***/
 
 #pragma config DEBUG =      OFF
@@ -63,13 +62,13 @@
 
 
 void set_performance_mode()
-{   
+{
 	unsigned int cp0;
-	
+
     // Unlock Sequence
     asm volatile("di"); // Disable all interrupts
     SYSKEY = 0xAA996655;
-    SYSKEY = 0x556699AA;  
+    SYSKEY = 0x556699AA;
 
     // PB1DIV
     // Peripheral Bus 1 cannot be turned off, so there's no need to turn it on
@@ -109,7 +108,7 @@ void set_performance_mode()
     cp0 = _mfc0(16, 0);
     cp0 &= ~0x07;
     cp0 |= 0b011; // K0 = Cacheable, non-coherent, write-back, write allocate
-    _mtc0(16, 0, cp0);  
+    _mtc0(16, 0, cp0);
 
     // Lock Sequence
     SYSKEY = 0x33333333;
@@ -123,28 +122,28 @@ void set_performance_mode()
 
 //This function will initialize the I2C(1) peripheral.
 void Setup_I2C(void)
-{	
+{
 	ANSELGbits.ANSG7 = 0;
     ANSELGbits.ANSG8 = 0;
     TRISGbits.TRISG7 = 1;
 	TRISGbits.TRISG8 = 1;
-	
-    I2C4CON = 0;            // Turn off I2C1 module
+
+    I2C4CON = 0;            // Turn off I2C4 module
     I2C4CONbits.DISSLW = 1; // Disable slew rate for 100kHz
-	
+
     //Set the I2C BRG Baud Rate.
 //    float BRG = ((1 / (2 * FSCK)) - TPGD) * (PBCLK) - 2;
 //    I2C4BRG = (int)BRG;     // Set baud rate
 //    char buf[30];
 //    sprintf(buf, "%f\n", BRG);
 //	uart1_txwrite_str(buf);
-    
+
 //    I2C4BRG = 75;  // test with a lower baud rate --> WORKS for MCP23016
-    I2C4BRG = 75;  // test with a lower baud rate
+    I2C4BRG = 0x01ED;  // test with a lower baud rate
 
 	//Now we will initialise the I2C peripheral for Master Mode, No Slew Rate
 	//Control, SMbus levels, and leave the peripheral switched off.
-	
+
 	I2C4CONbits.I2CEN = 0;
 	I2C4CONbits.I2CSIDL = 0;
 	I2C4CONbits.SCLREL = 1;
@@ -160,12 +159,12 @@ void Setup_I2C(void)
 	I2C4CONbits.PEN = 0;
 	I2C4CONbits.RSEN = 0;
 	I2C4CONbits.SEN = 0;
-	
+
 	//Clearing the receive and transmit buffers
 	I2C4RCV = 0x0000;
 	I2C4TRN = 0x0000;
-	
-	//Now we can enable the peripheral	
+
+	//Now we can enable the peripheral
 	I2C4CONbits.I2CEN = 1;
 	uart1_txwrite_str("I2C Setup Complete\n");
 }
@@ -182,7 +181,7 @@ unsigned int IdleI2C(void)
 
 unsigned int StartI2C(void)
 {
-	//This function generates an I2C start condition and returns status 
+	//This function generates an I2C start condition and returns status
 	//of the Start.
     IdleI2C();
 	I2C4CONbits.SEN = 1;		//Generate Start Condition
@@ -198,12 +197,12 @@ unsigned int StartI2C(void)
 ********************************************************************/
 unsigned int RestartI2C(void)
 {
-	//This function generates an I2C Restart condition and returns status 
+	//This function generates an I2C Restart condition and returns status
 	//of the Restart.
 
-	I2C4CONbits.RSEN = 1;		//Generate Restart		
+	I2C4CONbits.RSEN = 1;		//Generate Restart
 	//Nop();
-	while (I2C4CONbits.RSEN);	//Wait for restart	
+	while (I2C4CONbits.RSEN);	//Wait for restart
 	//return(I2C4STATbits.S);	//Optional - return status
 }
 
@@ -214,7 +213,7 @@ unsigned int RestartI2C(void)
 ********************************************************************/
 unsigned int StopI2C(void)
 {
-	//This function generates an I2C stop condition and returns status 
+	//This function generates an I2C stop condition and returns status
 	//of the Stop.
 
 	I2C4CONbits.PEN = 1;		//Generate Stop Condition
@@ -307,7 +306,7 @@ unsigned char getI2C(void)
 //#define IOCON1 0x0B
 //
 //void MCP23016_read(unsigned char *value_lsb, unsigned char *value_msb){
-//    StartI2C();                            /* Send start condition */  
+//    StartI2C();                            /* Send start condition */
 ////    uart1_txwrite_str("TST1\t");
 //    WriteI2C(MCP23016_ADDRESS << 1);    /* Send MCP23016's address, read/write bit not set (AD + R) */
 //    IdleI2C();
@@ -319,7 +318,7 @@ unsigned char getI2C(void)
 ////    uart1_txwrite_str("TST3\t");
 //    RestartI2C();
 ////    uart1_txwrite_str("TST4\t");
-//    WriteI2C(MCP23016_ADDRESS << 1 | 0x1);  /* Send MCP23016's address, read/write bit set (AD + W) */  
+//    WriteI2C(MCP23016_ADDRESS << 1 | 0x1);  /* Send MCP23016's address, read/write bit set (AD + W) */
 ////    uart1_txwrite_str("TST5\t");
 //    while(!ACKStatus());
 //    IdleI2C();
@@ -334,7 +333,7 @@ unsigned char getI2C(void)
 //
 //
 //void MCP23016_write(unsigned char reg, unsigned char value1, unsigned char value2){
-//    StartI2C();                         /* Send start condition */  
+//    StartI2C();                         /* Send start condition */
 //    WriteI2C(MCP23016_ADDRESS << 1);    /* Send MCP23016's address, read/write bit not set (AD + R) */
 //    IdleI2C();
 //    while(!ACKStatus());
@@ -347,17 +346,17 @@ unsigned char getI2C(void)
 //    WriteI2C(value2);                   /* Send the message */
 //    IdleI2C();
 //    while(!ACKStatus());
-//    StopI2C();                          /* Send stop condition */  
+//    StopI2C();                          /* Send stop condition */
 //}
 //
 //void main(){
 //    char *buf_test = "\nTEST Main\n";
 //    char buf_r1[100], buf_r2[100];
 ////    unsigned char value_w = 0x2e;
-//    
+//
 //    unsigned char value_lsb, value_msb;
 //    set_performance_mode();
-//    
+//
 //    uart1_init(9600);
 //    uart1_txwrite_str(buf_test);
 //    Setup_I2C();
@@ -378,36 +377,116 @@ unsigned char getI2C(void)
 //}
 ////////////////////////////////////////////////////////////////////////////// I2C for MCP23016 ///////////////////////////////////////////////////////////////////////////////
 
-
-#define MCP23008_ADDRESS 0x20            // The address of MCP23016 when the AD0 pin is connected to ground
-
-#define IODIR 0x00
-#define IPOL 0x01
-#define GPINTEN 0x02
-#define DEFVAL 0x03
-#define INTCON_MCP 0x04
-#define IOCON 0x05
-#define GPPU 0x06
-#define INTF 0x07
-#define INTCAP 0x08
-#define GPIO 0x09
-#define OLAT 0x0A
-
-void MCP23008_read(unsigned char *value){
-    StartI2C();                            /* Send start condition */  
-//    uart1_txwrite_str("TST1\t");
-    WriteI2C(MCP23008_ADDRESS << 1);    /* Send MCP23008's address, read/write bit not set (AD + R) */
-    IdleI2C();
-    while(!ACKStatus());
-//    uart1_txwrite_str("TST2\t");
-    WriteI2C(GPIO);                      /* Send the command byte */
-    IdleI2C();
-    while(!ACKStatus());
-//    uart1_txwrite_str("TST3\t");
-    RestartI2C();
+////////////////////////////////////////////////////////////////////////////// I2C for MCP23008 ///////////////////////////////////////////////////////////////////////////////
+//#define MCP23008_ADDRESS 0x20            // The address of MCP23016 when the AD0 pin is connected to ground
+//
+//#define IODIR 0x00
+//#define IPOL 0x01
+//#define GPINTEN 0x02
+//#define DEFVAL 0x03
+//#define INTCON_MCP 0x04
+//#define IOCON 0x05
+//#define GPPU 0x06
+//#define INTF 0x07
+//#define INTCAP 0x08
+//#define GPIO 0x09
+//#define OLAT 0x0A
+//
+//void MCP23008_read(unsigned char *value){
+//    StartI2C();                            /* Send start condition */
+////    uart1_txwrite_str("TST1\t");
+//    WriteI2C(MCP23008_ADDRESS << 1);    /* Send MCP23008's address, read/write bit not set (AD + R) */
+//    IdleI2C();
+//    while(!ACKStatus());
+////    uart1_txwrite_str("TST2\t");
+//    WriteI2C(GPIO);                      /* Send the command byte */
+//    IdleI2C();
+//    while(!ACKStatus());
+////    uart1_txwrite_str("TST3\t");
+//    RestartI2C();
+////    uart1_txwrite_str("TST4\t");
+//    WriteI2C(MCP23008_ADDRESS << 1 | 0x1);  /* Send MCP23008's address, read/write bit set (AD + W) */
+////    uart1_txwrite_str("TST5\t");
+//    while(!ACKStatus());
+//    IdleI2C();
+//    *value = getI2C();                     /* Read value from the I2C bus */
+//    NotAckI2C();
+//    StopI2C();                             /* Send stop condition */
+//}
+//
+//void MCP23008_write(unsigned char reg, unsigned char value1){
+//    StartI2C();                         /* Send start condition */
+////    uart1_txwrite_str("TST1\t");
+//    WriteI2C(MCP23008_ADDRESS << 1);    /* Send MCP23016's address, read/write bit not set (AD + R) */
+////    uart1_txwrite_str("TST2\t");
+//    IdleI2C();
+////    uart1_txwrite_str("TST3\t");
+//    while(!ACKStatus());
 //    uart1_txwrite_str("TST4\t");
-    WriteI2C(MCP23008_ADDRESS << 1 | 0x1);  /* Send MCP23008's address, read/write bit set (AD + W) */  
+//    WriteI2C(reg);                      /* Send the command byte */
+//    IdleI2C();
 //    uart1_txwrite_str("TST5\t");
+//    while(!ACKStatus());
+//    uart1_txwrite_str("TST6\t");
+//    WriteI2C(value1);                   /* Send the message */
+//    uart1_txwrite_str("TST7\t");
+//    IdleI2C();
+//    uart1_txwrite_str("TST8\t");
+//    while(!ACKStatus());
+//    uart1_txwrite_str("TST9\t");
+//    StopI2C();                          /* Send stop condition */
+//}
+//
+//void main(){
+//    char *buf_test = "\nTEST Main\n";
+//    char buf_r1[100], buf_r2[100];
+////    unsigned char value_w = 0x2e;
+//
+//    unsigned char value;
+////    set_performance_mode();
+//
+//    uart1_init(9600);
+//    uart1_txwrite_str(buf_test);
+//    Setup_I2C();
+//    MCP23008_write(IODIR, 0xff); // Set all as inputs - for reading
+//    uart1_txwrite_str("After Write ");
+//    while(1){
+//        /* WRITE TEST --> WORKS!! */
+////        MCP23016_write(GP0, 0x11, 0xf1);
+////        uart1_txwrite_str("After Write 2 ");
+//        /* READ TEST --> WORKS!!!!!!!!! */
+//        MCP23008_read(&value);
+//        sprintf(buf_r1, "0x%x\t",  value);
+//        uart1_txwrite_str(buf_r1);
+//    }
+//}
+////////////////////////////////////////////////////////////////////////////// I2C for MCP23008 ///////////////////////////////////////////////////////////////////////////////
+
+
+////////////////////////////////////////////////////////////////////////////// I2C for NCD9830 ///////////////////////////////////////////////////////////////////////////////
+#define NCD9830_ADDRESS 0x4A
+//#define NCD9830_ADDRESS 0x4B
+
+#define CH0 0b10001000
+#define CH1 0b11000100
+#define CH2 0b10010100
+#define CH3 0b11010100
+#define CH4 0b10100100
+#define CH5 0b11100100
+#define CH6 0b10110100
+#define CH7 0b11110100
+
+
+void NCD9830_read(unsigned char channel, unsigned char *value){
+    StartI2C();                            /* Send start condition */
+    WriteI2C(NCD9830_ADDRESS << 1);    /* Send NCD9830's address, read/write bit not set (AD + R) */
+    IdleI2C();
+    while(!ACKStatus());
+    WriteI2C(channel);                      /* Send the command byte */
+    IdleI2C();
+    while(!ACKStatus());
+    RestartI2C();
+    WriteI2C(NCD9830_ADDRESS << 1 | 0x1);  /* Send NCD9830's address, read/write bit set (AD + W) */
     while(!ACKStatus());
     IdleI2C();
     *value = getI2C();                     /* Read value from the I2C bus */
@@ -415,117 +494,34 @@ void MCP23008_read(unsigned char *value){
     StopI2C();                             /* Send stop condition */
 }
 
-void MCP23008_write(unsigned char reg, unsigned char value1){
-    StartI2C();                         /* Send start condition */  
-//    uart1_txwrite_str("TST1\t");
-    WriteI2C(MCP23008_ADDRESS << 1);    /* Send MCP23016's address, read/write bit not set (AD + R) */
-//    uart1_txwrite_str("TST2\t");
-    IdleI2C();
-//    uart1_txwrite_str("TST3\t");
-    while(!ACKStatus());
-    uart1_txwrite_str("TST4\t");
-    WriteI2C(reg);                      /* Send the command byte */
-    IdleI2C();
-    uart1_txwrite_str("TST5\t");
-    while(!ACKStatus());
-    uart1_txwrite_str("TST6\t");
-    WriteI2C(value1);                   /* Send the message */
-    uart1_txwrite_str("TST7\t");
-    IdleI2C();
-    uart1_txwrite_str("TST8\t");
-    while(!ACKStatus());
-    uart1_txwrite_str("TST9\t");
-    StopI2C();                          /* Send stop condition */  
-}   
 
 void main(){
     char *buf_test = "\nTEST Main\n";
-    char buf_r1[100], buf_r2[100];
-//    unsigned char value_w = 0x2e;           
-    
+    char buf[10];
+
     unsigned char value;
-//    set_performance_mode();
-    
+    set_performance_mode();
+
     uart1_init(9600);
     uart1_txwrite_str(buf_test);
     Setup_I2C();
-    MCP23008_write(IODIR, 0xff); // Set all as inputs - for reading
-    uart1_txwrite_str("After Write ");
     while(1){
-        /* WRITE TEST --> WORKS!! */
-//        MCP23016_write(GP0, 0x11, 0xf1);
-//        uart1_txwrite_str("After Write 2 ");
-        /* READ TEST --> WORKS!!!!!!!!! */
-        MCP23008_read(&value);
-        sprintf(buf_r1, "0x%x\t",  value);
-        uart1_txwrite_str(buf_r1);
-    }
-}
-
-
-////////////////////////////////////////////////////////////////////////////// I2C for NCD9830 ///////////////////////////////////////////////////////////////////////////////
-//#define NCD9830_ADDRESS 0x4A
-//#define CH3 0b11010100
-//#define CH4 0b10100100
-//#define CH6 0b10110100
-//#define CH7 0b11110100
-//
-//
-//void NCD9830_read(unsigned char channel, unsigned char *value){
-//    uart1_txwrite_str("TST0\t");
-//    StartI2C();                            /* Send start condition */  
-//    uart1_txwrite_str("TST1\t");
-//    WriteI2C(NCD9830_ADDRESS << 1);    /* Send NCD9830's address, read/write bit not set (AD + R) */
-//    uart1_txwrite_str("TST2\t");
-//    IdleI2C();
-//    uart1_txwrite_str("TST3\t");
-//    while(!ACKStatus());
-//    uart1_txwrite_str("TST4\t");
-//    WriteI2C(channel);                      /* Send the command byte */
-//    IdleI2C();
-//    while(!ACKStatus());
-//    uart1_txwrite_str("TST4\t");
-//    RestartI2C();
-//    uart1_txwrite_str("TST5\t");
-//    WriteI2C(NCD9830_ADDRESS << 1 | 0x1);  /* Send NCD9830's address, read/write bit set (AD + W) */  
-//    uart1_txwrite_str("TST6\t");
-//    while(!ACKStatus());
-//    IdleI2C();
-//    uart1_txwrite_str("TST7\t");
-//    *value = getI2C();                     /* Read value from the I2C bus */
-//    NotAckI2C();
-//    StopI2C();                             /* Send stop condition */
-//    uart1_txwrite_str("TST8\t");
-//}
-//
-//
-//void main(){
-//    char *buf_test = "\nTEST Main\n";
-//    char buf[10];
-//    
-//    unsigned char value;
-//    set_performance_mode();
-//    
-//    uart1_init(9600);
-//    uart1_txwrite_str(buf_test);
-//    Setup_I2C();
-////    while(1){
-//        /* READ TEST */
+        /* READ TEST */
 //        uart1_txwrite_str("TST0\t");
-//        StartI2C();                            /* Send start condition */  
+//        StartI2C();                            /* Send start condition */
 //        uart1_txwrite_str("TST1\t");
 //        WriteI2C(NCD9830_ADDRESS << 1);    /* Send NCD9830's address, read/write bit not set (AD + R) */
 //        uart1_txwrite_str("TST2\t");
 //        IdleI2C();
-//        uart1_txwrite_str("TST3\t");
+//        uart1_txwrite_str("TST3\n");
 //        StopI2C();
-////        while(!ACKStatus());
-////        uart1_txwrite_str("TST4\t");
-//
-////        NCD9830_read(CH4, &value);
-////        uart1_txwrite_str("AFTER READ\t");
-////        sprintf(buf, "0x%x\n",  value);
-////        uart1_txwrite_str(buf);
-////    }
-//}
+//        while(!ACKStatus());
+//        uart1_txwrite_str("TST4\t");
+
+        NCD9830_read(CH7, &value);
+        uart1_txwrite_str("AFTER READ\t");
+        sprintf(buf, "%d\n",  value);
+        uart1_txwrite_str(buf);
+    }
+}
 ////////////////////////////////////////////////////////////////////////////// I2C for NCD9830 ///////////////////////////////////////////////////////////////////////////////

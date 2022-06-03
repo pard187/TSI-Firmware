@@ -1,17 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?> 
 <project>                                  
-  <executable name="dist/default/production/I2C_Test_Logic.X.production.elf">                 
+  <executable name="dist/default/debug/I2C_Test_Logic.X.debug.elf">                 
     <memory name="program">                 
       <units>bytes</units>                 
       <length>2098304</length>                 
-      <used>13008</used>                     
-      <free>2085296</free>                     
+      <used>13024</used>                     
+      <free>2085280</free>                     
     </memory>                              
     <memory name="data">              
       <units>bytes</units>                 
-      <length>524288</length>                 
-      <used>396</used>                     
-      <free>523892</free>                     
+      <length>525184</length>                 
+      <used>2188</used>                     
+      <free>522996</free>                     
     </memory>                              
   </executable>                            
 </project>                                 

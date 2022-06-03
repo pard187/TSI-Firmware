@@ -1,2 +1,5 @@
 **/*.mk
 **/*.o.d
+/2022_firmware/2022_DriveState_Firmware.X/build/
+/2022_firmware/New_PIC_Firmware.X/build/
+/2022_firmware/New_PIC_Firmware.X/dist/

@@ -1,3 +1,4 @@
+// PRAGMAS //
 /*** DEVCFG0 ***/
 #pragma config DEBUG =      OFF
 #pragma config JTAGEN =     OFF
@@ -53,51 +54,58 @@
 #pragma config CSEQ =       0xffff
 
 
+
+// LIBRARAY AND FILE INCLUDES //
 #include <xc.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include "uart1.h"
 #include "timer1.h"
+#include "i2c4.h"
 
 
-typedef enum {throttle_impl, zero_flowrate} err_type;
 
-static enum DRIVE_STATES {IDLE, DRIVE_SETUP, DRIVE_READY, DRIVE, ERROR, COOLDOWN} DRIVE_STATE = IDLE;
+// NEW TYPE DEFS //
+typedef enum {throttle_impl, zero_flowrate} err_type; // define a new error type - not used yet
+static enum DRIVE_STATES {IDLE, DRIVE_SETUP, DRIVE_READY, DRIVE, ERROR, COOLDOWN} DRIVE_STATE = IDLE; // define all drive states
 
 
-// Inputs
-uint32_t Flowrate_LOGIC; // RB7 --> 18 (PIC) / 27 (BOB) - DIP1
+// INPUT VARIABLES //
+// uint32_t Flowrate_LOGIC; // OLD WAY: RB7 --> 18 (PIC) / 27 (BOB) - DIP1
+float Flowrate_ANALOG; // NEW WAY: CH7 on the ADC (U43)
 uint32_t Brake_Pressed_uC; // RC12 --> 31 (PIC) / 40 (BOB) - DIP2
-//uint32_t Safety_Loop; // RC13 --> 47 (PIC) / 74 (BOB) - DIP3
-//uint32_t Drive_BTN_LOGIC; // RC14 --> 48 (PIC) / 75 (BOB) - DIP4
-uint32_t Safety_Loop; // RE1 --> 61 (PIC) / 97 (BOB) - DIP3
-uint32_t Drive_BTN_LOGIC; // RE2 --> 62 (PIC) / 98 (BOB) - DIP4
+uint32_t Safety_Loop; // RC13 --> 47 (PIC) / 74 (BOB) - DIP3
+uint32_t Drive_BTN_LOGIC; // RC14 --> 48 (PIC) / 75 (BOB) - DIP4
 uint32_t PC_Ready; // RC15 --> 32 (PIC) / 41 (BOB) - DIP5
-//uint32_t Throttle_PL_LOGIC; // RE6 --> 2 (PIC) / 2 (BOB) - DIP6
-uint32_t Throttle_PL_LOGIC; // RB8 --> 21 (PIC) / 30 (BOB) - DIP6
-  
+uint32_t Throttle_PL_LOGIC; // RE6 --> 2 (PIC) / 2 (BOB) - DIP6
 
-// Outputs
-//uint32_t Cooling_CTRL; // RD0 --> 46 (PIC) / 73 (BOB) - BLUE
-//uint32_t D_LED_CTRL; // RD1 --> 49 (PIC) / 85 (BOB) - RED
-uint32_t Cooling_CTRL; // RE3 --> 63 (PIC) / 99 (BOB) - BLUE
-uint32_t D_LED_CTRL; // RE4 --> 64 (PIC) / 100 (BOB) - RED
+
+// OUTPUT VARIABLES //
+uint32_t Cooling_CTRL; // RD0 --> 46 (PIC) / 73 (BOB) - BLUE
+uint32_t D_LED_CTRL; // RD1 --> 49 (PIC) / 85 (BOB) - RED
 uint32_t Throttle_EN; // RD3 --> 51 (PIC) / 87 (BOB) - GREEN
 uint32_t RTDS_CTRL; // RE0 --> 58 (PIC) / 94 (BOB) - YELLOW
 
 
-// Internal Variables
-err_type err;
-uint16_t ta, tb, cnt_cur = 0;
-uint16_t rst_flash1, rst_flash2, rst_flash3;
-uint16_t rst_rtds, rst_brake, rst_cooldn;
-uint32_t cnt_rtds = 20, cnt_brake = 30, cnt_cooldn = 30;
-uint32_t done_rtds, done_brake, done_cooldn;
-uint32_t flowrate_low_thresh = 0, flowrate_upp_thresh = 0;
-char buf[100];
+// INTERNAL VARIABLES //
+uint16_t ta, tb, cnt_cur = 0; // timer variables
+uint16_t rst_flash1, rst_flash2, rst_flash3; // reset variables for the different drive button LED flashing seq
+uint16_t rst_rtds, rst_dbtn_unpress, rst_dbtn_press, rst_cooldn; // reset variables for other timers
+uint32_t cnt_rtds = 20, cnt_dbtn_unpress = 10, cnt_dbtn_press = 3, cnt_cooldn = 30; // count duration for other timers (counts of ~100 ms)
+uint32_t done_rtds, done_dbtn_unpress, done_dbtn_press, done_cooldn; // treated as booleans to store the state of each timer
+char value; // stores the analog value of flowrate coming straight from the ADC
+uint32_t Flowrate_LOGIC, Flowrate_LOGIC_old, Flowrate_CALC = 1; // more variables for processing and calculating flowrate
+uint32_t flowrate_low_thresh = 0, flowrate_upp_thresh = 0; // lower and upper threshold for transitions based on flowrate - currently both at zero, can change later
+uint16_t ta1 = 0, tb1 = 0, rst_timeout, tb_timeout, cnt_cur1, cnt_timeout = 600; // timer variables specific to the flowrate timeout - timeout at 1 min
+uint16_t first_read; // treated as boolean to implement the flowrate logic
+uint32_t Drive_BTN_LOGIC_old; // stores the old DRIVE_BTN_LOGIC value for debouncing
+char buf[100]; // string buffer for UART printing
 
 
-void flash_LED(uint16_t rst_flash, uint16_t cnt_on, uint16_t cnt_off){ // cnt_on and cnt_off are # of 100ms
+
+// HELPER FUNCTIONS //
+// flashes the drive button LED at a pattern specified by cnt_on and cnt_off which are counts of ~100ms
+void flash_LED(uint16_t rst_flash, uint16_t cnt_on, uint16_t cnt_off){
     if(D_LED_CTRL == 1 && timer1_cnt_auto(rst_flash, &ta, &tb, &cnt_cur, cnt_on)){
         D_LED_CTRL = 0;
         return;
@@ -106,15 +114,13 @@ void flash_LED(uint16_t rst_flash, uint16_t cnt_on, uint16_t cnt_off){ // cnt_on
         D_LED_CTRL = 1;
         return;
     }
-}
+} // flash_LED()
 
-uint16_t ta1 = 0, tb1 = 0, tb_timeout, cnt_cur1, cnt_timeout = 60;
-uint32_t Flowrate_LOGIC_old;
-uint32_t Flowrate_calc;
-uint16_t first_read;
 
+// calculates "actual" flowrate, returns FLOWRATE_CALC which is zero for no flowrate, non-zero otherwise
 uint32_t read_flowrate(){
     if(Flowrate_LOGIC == !Flowrate_LOGIC_old){
+        rst_timeout = 1;
         if(!first_read){
             ta1 = timer1_read();
             first_read = 1;
@@ -125,67 +131,73 @@ uint32_t read_flowrate(){
         }
     }
     else{
-        if(Flowrate_calc == 0){
-            return Flowrate_calc;
+        if(Flowrate_CALC == 0){
+            return Flowrate_CALC;
         }
         else{
             tb_timeout = timer1_read();
-            if(timer1_cnt_auto(0, &ta1, &tb_timeout, &cnt_cur1, cnt_timeout)){
-                Flowrate_calc = 0;
-                return Flowrate_calc;
-            } 
+            ////  uncomment for testing  ////
+            //    sprintf(buf, "CNT_CUR1: %d", cnt_cur1);
+            //    uart1_txwrite_str(buf);
+            if(first_read && timer1_cnt_auto(rst_timeout, &ta1, &tb_timeout, &cnt_cur1, cnt_timeout) || !first_read && timer1_cnt_auto(rst_timeout, &tb1, &tb_timeout, &cnt_cur1, cnt_timeout)){
+                Flowrate_CALC = 0;
+                return Flowrate_CALC;
+            }
+            rst_timeout = 0;
         }
     }
-    Flowrate_calc = 7.77*1000.0/timer1_elapsed_ms(ta1, tb1);
-    Flowrate_LOGIC_old = Flowrate_LOGIC;
-    return Flowrate_calc;
-}
+    Flowrate_CALC = 7.77*1000.0/timer1_elapsed_ms(ta1, tb1); // approximated based on flowrate sensor datasheet
+    return Flowrate_CALC;
+} // read_flowrate()
 
+
+// Sets all input/output and digital/analog registers
 void GPIO_setup(){
     // Inputs
     TRISBbits.TRISB7 = 1;
     TRISCbits.TRISC12 = 1;
-//    TRISCbits.TRISC13 = 1;
-//    TRISCbits.TRISC14 = 1;
-    TRISEbits.TRISE1 = 1;
-    TRISEbits.TRISE2 = 1;
+    TRISCbits.TRISC13 = 1;
+    TRISCbits.TRISC14 = 1;
     TRISCbits.TRISC15 = 1;
-//    TRISEbits.TRISE6 = 1;
-    TRISBbits.TRISB8 = 1;
-    
+    ANSELEbits.ANSE6 = 0;
+    TRISEbits.TRISE6 = 1;
+
     // Outputs
-//    TRISDbits.TRISD0 = 0;
-//    TRISDbits.TRISD1 = 0;
-    TRISEbits.TRISE3 =  0;
-    TRISEbits.TRISE4 =  0;    
+    TRISDbits.TRISD0 = 0;
+    TRISDbits.TRISD1 = 0;
     TRISDbits.TRISD3 = 0;
     TRISEbits.TRISE0 =  0;
-}
+} // GPIO_setup()
 
-void GPIO_update(){
+
+// Updates all input and output values
+void val_update(){
     // Inputs
-    Flowrate_LOGIC = PORTBbits.RB7;
-    Flowrate_calc = read_flowrate();
+    //    Flowrate_LOGIC = PORTBbits.RB7; // OLD WAY: read as digital - inaccurate
+    NCD9830_read(U43_NCD9830_ADDRESS, CH7, &value); // NEW WAY: read as analog (via I2C) then convert to digital - works
+    Flowrate_ANALOG = (float) (value/255.0) * 5.0;
+    Flowrate_LOGIC_old = Flowrate_LOGIC;
+    if(Flowrate_ANALOG <= 0.7) Flowrate_LOGIC = 0;
+    else Flowrate_LOGIC = 1;
+    Flowrate_CALC = read_flowrate(); // Flowrate_CALC is zero for no flow, non-zero otherwise
     Brake_Pressed_uC = PORTCbits.RC12;
-//    Safety_Loop = PORTCbits.RC13;
-//    Drive_BTN_LOGIC = PORTCbits.RC14;
-    Safety_Loop = PORTEbits.RE1;
-    Drive_BTN_LOGIC = PORTEbits.RE2;
+    Safety_Loop = PORTCbits.RC13;
+    Drive_BTN_LOGIC_old = Drive_BTN_LOGIC;
+    Drive_BTN_LOGIC = !PORTCbits.RC14;
     PC_Ready = PORTCbits.RC15;
-//    Throttle_PL_LOGIC = PORTEbits.RE6;
-    Throttle_PL_LOGIC = PORTBbits.RB8;
-    
+    Throttle_PL_LOGIC = !PORTEbits.RE6;
+
     // Outputs
-//    LATDbits.LATD0 = Cooling_CTRL;
-//    LATDbits.LATD1 = D_LED_CTRL;
-    LATEbits.LATE3 = Cooling_CTRL;
-    LATEbits.LATE4 = D_LED_CTRL;
+    LATDbits.LATD0 = Cooling_CTRL;
+    LATDbits.LATD1 = D_LED_CTRL;
     LATDbits.LATD3 = Throttle_EN;
     LATEbits.LATE0 = RTDS_CTRL;
-}
+} // val_upadte()
 
+
+// Implements Drive States FSM - diagram here: https://drive.google.com/file/d/12cyzbJN2y9wIt-cWi9elMI7VQYl9TgO6/view?usp=sharing
 void DRIVE_STATE_FSM(){
-    // drive state outputs
+    // Drive States Outputs
     switch(DRIVE_STATE){
         case IDLE:
             uart1_txwrite_str("IDLE \t - \t");
@@ -219,7 +231,9 @@ void DRIVE_STATE_FSM(){
             Cooling_CTRL = 1;
             RTDS_CTRL = 1;
             Throttle_EN = 1;
-            rst_brake = 1;
+            done_dbtn_unpress = 0;
+            rst_dbtn_unpress = 1;
+            rst_dbtn_press = 1;
             D_LED_CTRL = 1;
             break;
         case DRIVE:
@@ -231,17 +245,25 @@ void DRIVE_STATE_FSM(){
             rst_flash2 = 1;
             rst_flash3 = 1;
             rst_cooldn = 1;
-            if(Brake_Pressed_uC && Drive_BTN_LOGIC){
-                done_brake = timer1_cnt_auto(rst_brake, &ta, &tb, &cnt_cur, cnt_brake);
-                rst_brake = 0;
+            if(!done_dbtn_unpress && !Drive_BTN_LOGIC){
+                done_dbtn_unpress = timer1_cnt_auto(rst_dbtn_unpress, &ta, &tb, &cnt_cur, cnt_dbtn_unpress);
+                rst_dbtn_unpress = 0;
+            }
+            else if(!done_dbtn_unpress && Drive_BTN_LOGIC){
+                done_dbtn_unpress = 0;
+                rst_dbtn_unpress = 1;
+            }
+            if(done_dbtn_unpress && Brake_Pressed_uC && Drive_BTN_LOGIC){
+                done_dbtn_press = timer1_cnt_auto(rst_dbtn_press, &ta, &tb, &cnt_cur, cnt_dbtn_press);
+                rst_dbtn_press = 0;
             }
             else{
-                done_brake = 0;
-                rst_brake = 1;
+                done_dbtn_press = 0;
+                rst_dbtn_press = 1;
             }
             break;
         case ERROR:
-            uart1_txwrite_str("ERROR \t - \t");
+            uart1_txwrite_str("\nERROR \t - \t");
             Cooling_CTRL = 1;
             RTDS_CTRL = 0;
             Throttle_EN = 0;
@@ -249,11 +271,11 @@ void DRIVE_STATE_FSM(){
             rst_rtds = 1;
             rst_flash1 = 1;
             if(!Throttle_PL_LOGIC){
-                flash_LED(rst_flash2, 1, 1);
+                flash_LED(rst_flash2, 2, 2);
                 rst_flash2 = 0;
                 rst_flash3 = 1;
             }
-            else if(Flowrate_calc <= flowrate_low_thresh){
+            else if(Flowrate_CALC <= flowrate_low_thresh){
                 flash_LED(rst_flash3, 5, 15);
                 rst_flash2 = 1;
                 rst_flash3 = 0;
@@ -276,12 +298,13 @@ void DRIVE_STATE_FSM(){
             Throttle_EN = 0;
             D_LED_CTRL = 0;
             rst_rtds = 1;
-            rst_brake = 1;
+            rst_dbtn_unpress = 1;
+            rst_dbtn_press = 1;
             rst_cooldn = 1;
             break;
     }
-    
-    // drive state transitions
+
+    // Drive States Transitions
     switch(DRIVE_STATE){
         case IDLE:
             if(PC_Ready && Safety_Loop) DRIVE_STATE = DRIVE_SETUP;
@@ -290,7 +313,7 @@ void DRIVE_STATE_FSM(){
         case DRIVE_SETUP:
             if(!Safety_Loop) DRIVE_STATE = IDLE;
             else if(Brake_Pressed_uC && Drive_BTN_LOGIC) DRIVE_STATE = DRIVE_READY;
-            else if(!Throttle_PL_LOGIC || Flowrate_calc <= flowrate_low_thresh) DRIVE_STATE = ERROR;
+            else if(!Throttle_PL_LOGIC || Flowrate_CALC <= flowrate_low_thresh) DRIVE_STATE = ERROR;
             else DRIVE_STATE = DRIVE_SETUP;
             break;
         case DRIVE_READY:
@@ -300,13 +323,13 @@ void DRIVE_STATE_FSM(){
             break;
         case DRIVE:
             if(!Safety_Loop) DRIVE_STATE = IDLE;
-            else if(!Throttle_PL_LOGIC || Flowrate_calc <= flowrate_low_thresh) DRIVE_STATE = ERROR;
-            else if(done_brake) DRIVE_STATE = COOLDOWN;
+            else if(!Throttle_PL_LOGIC || Flowrate_CALC <= flowrate_low_thresh) DRIVE_STATE = ERROR;
+            else if(done_dbtn_press) DRIVE_STATE = COOLDOWN;
             else DRIVE_STATE = DRIVE;
             break;
         case ERROR:
             if(!Safety_Loop) DRIVE_STATE = IDLE;
-            else if(Throttle_PL_LOGIC && Flowrate_calc > flowrate_upp_thresh) DRIVE_STATE = DRIVE_SETUP;
+            else if(Throttle_PL_LOGIC && Flowrate_CALC > flowrate_upp_thresh) DRIVE_STATE = DRIVE_SETUP;
             else DRIVE_STATE = ERROR;
             break;
         case COOLDOWN:
@@ -318,33 +341,42 @@ void DRIVE_STATE_FSM(){
             DRIVE_STATE = IDLE;
             break;
     }
-}
+} // DRIVE_STATE_FSM()
 
 
-void main(){    
-    uart1_init(9600);
+
+// MAIN //
+void main(){
+    uart1_init(9600); // initialize UART1 at baud rate = 9600 bit/sec
     uart1_txwrite_str("\nTEST Main\n");
-    
-    timer1_init();
-    GPIO_setup();
-    ta = timer1_read();
-    while(1){
-        GPIO_update();
-        DRIVE_STATE_FSM();
-        sprintf(buf, "Flowrate: %d\t", Flowrate_LOGIC);
-        uart1_txwrite_str(buf);
-        sprintf(buf, "Flowrate_calc: %04d\r\n", Flowrate_calc);
-        uart1_txwrite_str(buf);
-//        sprintf(buf, "Brake: %d\t", Brake_Pressed_uC);
-//        uart1_txwrite_str(buf);
-//        sprintf(buf, "Safety: %d\t", Safety_Loop);
-//        uart1_txwrite_str(buf);
-//        sprintf(buf, "Drv_Btn: %d\t", Drive_BTN_LOGIC);
-//        uart1_txwrite_str(buf);
-//        sprintf(buf, "PC: %d\t", PC_Ready);
-//        uart1_txwrite_str(buf);
-//        sprintf(buf, "Throttle: %d\r\n", Throttle_PL_LOGIC);
-//        uart1_txwrite_str(buf);
 
+    timer1_init(); // initialize timer1 - same timer is used to time different tasks
+    Setup_I2C(); // initialize I2C for 100 kHz communication by default
+    GPIO_setup(); // set up all input and output pins
+    ta = timer1_read(); // initialize the first timer reading (before loop)
+
+    while(1){
+        val_update(); // update all input and output values
+        DRIVE_STATE_FSM(); // write outputs and transition through the FSM
+
+        ////  uncomment to print values via UART  ////
+        //    sprintf(buf, "Flowrate_LOGIC_old: %d\t", Flowrate_LOGIC_old);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Flowrate_ANALOG: %f\t", Flowrate_ANALOG);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Flowrate_LOGIC: %d\t", Flowrate_LOGIC);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Flowrate_CALC: %d\n", Flowrate_CALC);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Brake: %d\t", Brake_Pressed_uC);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Safety: %d\t", Safety_Loop);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Drv_Btn: %d\t", Drive_BTN_LOGIC);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "PC: %d\t", PC_Ready);
+        //    uart1_txwrite_str(buf);
+        //    sprintf(buf, "Throttle: %d\r\n", Throttle_PL_LOGIC);
+        //    uart1_txwrite_str(buf);
     }
-}
+} // main()

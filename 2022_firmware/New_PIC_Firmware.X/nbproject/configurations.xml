@@ -6,6 +6,7 @@
                    projectFiles="true">
       <itemPath>uart1.h</itemPath>
       <itemPath>timer1.h</itemPath>
+      <itemPath>i2c4.h</itemPath>
     </logicalFolder>
     <logicalFolder name="LinkerScript"
                    displayName="Linker Files"
@@ -17,6 +18,7 @@
       <itemPath>main.c</itemPath>
       <itemPath>uart1.c</itemPath>
       <itemPath>timer1.c</itemPath>
+      <itemPath>i2c4.c</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"
@@ -32,10 +34,10 @@
         <targetDevice>PIC32MZ2048EFM064</targetDevice>
         <targetHeader></targetHeader>
         <targetPluginBoard></targetPluginBoard>
-        <platformTool>PICkit3PlatformTool</platformTool>
+        <platformTool></platformTool>
         <languageToolchain>XC32</languageToolchain>
-        <languageToolchainVersion>2.05</languageToolchainVersion>
-        <platform>3</platform>
+        <languageToolchainVersion>2.41</languageToolchainVersion>
+        <platform>4</platform>
       </toolsSet>
       <packs>
         <pack name="PIC32MZ-EF_DFP" vendor="Microchip" version="1.3.58"/>
@@ -59,7 +61,6 @@
       </compileType>
       <makeCustomizationType>
         <makeCustomizationPreStepEnabled>false</makeCustomizationPreStepEnabled>
-        <makeUseCleanTarget>false</makeUseCleanTarget>
         <makeCustomizationPreStep></makeCustomizationPreStep>
         <makeCustomizationPostStepEnabled>false</makeCustomizationPostStepEnabled>
         <makeCustomizationPostStep></makeCustomizationPostStep>
